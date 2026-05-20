@@ -1,0 +1,33 @@
+{
+  "name": "glb-to-frag-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "smoke": "node dist/glb-smoke-test.js",
+    "ir": "node dist/glb-to-ir.js",
+    "fraglike": "node dist/ir-to-fraglike.js",
+    "irfrag": "node dist/ir-to-frag.js",
+    "frag": "node dist/fraglike-to-frag.js",
+    "verify": "node dist/frag-verify.js",
+    "assets": "node dist/glb-extract-assets.js",
+    "metadata": "node dist/glb-inspect-metadata.js",
+    "pipeline": "node dist/glb-to-frag-pipeline.js"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/extensions": "^4.3.0",
+    "draco3dgltf": "^1.5.7",
+    "flatbuffers": "^25.9.23",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/jpeg-js": "^0.3.0",
+    "@types/node": "^24.10.1",
+    "@types/pngjs": "^6.0.5",
+    "flatc-bin": "^23.5.26",
+    "typescript": "^5.9.3"
+  }
+}
