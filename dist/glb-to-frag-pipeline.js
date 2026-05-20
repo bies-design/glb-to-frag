@@ -1,25 +1,25 @@
 import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 function usage() {
-    console.error('Usage: node dist/glb-to-frag-pipeline.js input.glb [--out absolute-output-dir]');
+    console.error('Usage: node dist/glb-to-frag-pipeline.js absolute-input.glb absolute-output-dir');
     process.exit(1);
 }
 function getCliArgs() {
     const args = process.argv.slice(2);
-    const input = args.find((arg) => !arg.startsWith('--'));
-    const outIndex = args.indexOf('--out');
-    const outputRoot = outIndex === -1 ? undefined : args[outIndex + 1];
-    if (!input || (outIndex !== -1 && !outputRoot)) {
+    const [input, output] = args;
+    if (!input || !output || args.length !== 2) {
         usage();
     }
-    if (outputRoot && !path.isAbsolute(outputRoot)) {
-        throw new Error(`--out must be an absolute path, got: ${outputRoot}`);
+    if (!path.isAbsolute(input)) {
+        throw new Error(`input.glb must be an absolute path, got: ${input}`);
+    }
+    if (!path.isAbsolute(output)) {
+        throw new Error(`output-dir must be an absolute path, got: ${output}`);
     }
     return {
-        inputPath: path.resolve(input),
-        outputRoot,
+        inputPath: input,
+        outputDir: output,
     };
 }
 function getDistDir() {
@@ -28,13 +28,12 @@ function getDistDir() {
 function getModelName(inputPath) {
     return path.basename(inputPath, path.extname(inputPath));
 }
-function getOutputPaths(inputPath, outputRoot) {
+function getOutputPaths(inputPath, outputDir) {
     const modelName = getModelName(inputPath);
-    const rootDir = outputRoot ?? path.dirname(inputPath);
     return {
-        irPath: path.join(rootDir, `${modelName}.ir.json`),
-        fragPath: path.join(rootDir, 'frag', `${modelName}.frag`),
-        materialPackageDir: path.join(rootDir, '材質包', modelName),
+        irPath: path.join(outputDir, `${modelName}.ir.json`),
+        fragPath: path.join(outputDir, `${modelName}.frag`),
+        materialPackageDir: path.join(outputDir, modelName),
     };
 }
 async function runNodeScript(scriptName, args) {
@@ -56,12 +55,10 @@ async function runNodeScript(scriptName, args) {
     });
 }
 async function main() {
-    const { inputPath, outputRoot } = getCliArgs();
-    const { irPath, fragPath, materialPackageDir } = getOutputPaths(inputPath, outputRoot);
-    await fs.mkdir(path.dirname(irPath), { recursive: true });
-    await fs.mkdir(path.dirname(fragPath), { recursive: true });
-    await fs.mkdir(materialPackageDir, { recursive: true });
+    const { inputPath, outputDir } = getCliArgs();
+    const { irPath, fragPath, materialPackageDir } = getOutputPaths(inputPath, outputDir);
     console.log(`source: ${inputPath}`);
+    console.log(`output dir: ${outputDir}`);
     console.log(`ir output: ${irPath}`);
     console.log(`frag output: ${fragPath}`);
     console.log(`material package output: ${materialPackageDir}`);
