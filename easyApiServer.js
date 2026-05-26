@@ -86,7 +86,8 @@ const server = http.createServer((req, res) => {
                                     message: `GLB 轉換成功，但材質包壓縮失敗`, 
                                     error: error.message,
                                     stdout: stdout,
-                                    stderr: stderr
+                                    stderr: stderr,
+                                    fragresult: absoluteMaterialsPath
                                 }));
                             } else {
                                 console.log(`[✅ 壓縮材質包成功] 儲存至: ${path.join(output_dir, fileNameWithoutExt + '.bzip2')}`);
@@ -94,7 +95,8 @@ const server = http.createServer((req, res) => {
                                 res.end(JSON.stringify({ 
                                     status: "completed", 
                                     message: "GLB 轉換成功，材質包壓縮成功", 
-                                    stdout: stdout 
+                                    stdout: stdout,
+                                    fragresult: absoluteMaterialsPath
                                 }));
                             }
                         });
@@ -107,7 +109,8 @@ const server = http.createServer((req, res) => {
                             status: "completed", 
                             message: "GLB 轉換成功，無材質包不必壓縮", 
                             stdout: stdout,
-                            error: "No materials folder generated, skipping compression step." // 這裡的 error 欄位只是為了讓 A 電腦能夠在收到回應後知道為什麼沒有壓縮包，而不是實際的錯誤 
+                            error: "No materials folder generated, skipping compression step.", // 這裡的 error 欄位只是為了讓 A 電腦能夠在收到回應後知道為什麼沒有壓縮包，而不是實際的錯誤 
+                            fragresult: absoluteMaterialsPath
                         }));
                     }
                 });
