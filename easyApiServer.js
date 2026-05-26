@@ -1,7 +1,7 @@
-const http = require('http');
-const { exec } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import http from 'http';
+import path from 'path';
+import fs from 'fs';
+import exec from 'child_process';
 
 const PORT = 9000; // 讓 Caddy 反向代理或外界直接呼叫的 Port
 
