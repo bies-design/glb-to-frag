@@ -173,6 +173,23 @@ const server = http.createServer((req, res) => {
     }
 });
 
+// ==========================================
+// 🚀 4. 監聽錯誤事件並啟動伺服器
+// ==========================================
+
+// 🟢 監聽啟動失敗或運行中的異常錯誤
+server.on('error', (err) => {
+    console.error(`\n[❌ Atomic API Server 啟動或運行失敗]:`);
+    console.error(`   - 錯誤代碼 (Code): ${err.code}`);
+    console.error(`   - 錯誤訊息 (Message): ${err.message}`);
+    console.error(`================================================================`);
+    
+    // 根據 Windows 服務常規，啟動失敗時通常會調用 process.exit(1) 
+    // 這樣 qckwinsvr 才能偵測到服務異常中止，並觸發自動重啟機制
+    process.exit(1);
+});
+
+// 啟動監聽，並在成功啟動後輸出服務資訊
 server.listen(PORT, () => {
     console.log(`================================================================`);
     console.log(`🟢 [Atomic API Server] glb-to-frag 內嵌微服務已成功啟動`);
