@@ -3,8 +3,48 @@ import path from 'path';
 import fs from 'fs';
 import exec from 'child_process';
 
+// 🟢 修正 ESM 環境在 Windows 下無法直接使用 __dirname 的問題
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const PORT = 9000; // 讓 Caddy 反向代理或外界直接呼叫的 Port
 
+// ==========================================
+// 🚀 1. 宣告並啟用 Log Worker 執行緒
+// ==========================================
+const workerPath = path.join(__dirname, 'logWorker.js');
+const logWorker = new Worker(workerPath, {
+    workerData: {
+        logDir: path.join(__dirname, '..', 'logs'), // 儲存資料夾
+        logName: 'glb-to-frag.log',             // 基礎 Log 檔名
+        maxSizeBytes: 10 * 1024 * 1024,      // 必備：單檔上限 10MB
+        maxFiles: 7,                         // 必備：大小滾動最多保留 5 個檔案
+        enableDateRotation: true,            // 選用 (Option)：啟用按天數滾動與清理
+        maxDays: 7                           // 選用 (Option)：保留最近 7 天的日誌
+    }
+});
+
+// ==========================================
+// 🔄 2. 劫持並拋接 stdout / stderr 到 Worker
+// ==========================================
+const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+const originalStderrWrite = process.stderr.write.bind(process.stderr);
+
+process.stdout.write = (chunk, encoding, callback) => {
+    // 拋接給 logWorker.js 執行緒處理檔案 I/O
+    logWorker.postMessage(`[INFO] ${chunk.toString()}`);
+    // 同時保持向 Windows 終端機標準輸出，供 qckwinsvr 擷取
+    return originalStdoutWrite(chunk, encoding, callback);
+};
+
+process.stderr.write = (chunk, encoding, callback) => {
+    logWorker.postMessage(`[ERROR] ${chunk.toString()}`);
+    return originalStderrWrite(chunk, encoding, callback);
+};
+
+// ==========================================
+// 🌐 3. API 伺服器核心管線
+// ==========================================
 const server = http.createServer((req, res) => {
     // 統一設定回應格式為 JSON 與基礎 CORS 防護
     res.setHeader('Content-Type', 'application/json');
