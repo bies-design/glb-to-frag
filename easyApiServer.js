@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import exec from 'child_process';
 
+import { Worker } from 'worker_threads';
+import { fileURLToPath } from 'url';
+
 // 🟢 修正 ESM 環境在 Windows 下無法直接使用 __dirname 的問題
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
