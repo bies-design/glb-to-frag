@@ -96,6 +96,7 @@ const server = http.createServer((req, res) => {
                                     status: "completed", 
                                     message: "GLB 轉換成功，材質包壓縮成功", 
                                     stdout: stdout,
+                                    ziptype: "bzip2",
                                     fragresult: `${absoluteMaterialsPath}.frag`
                                 }));
                             }
