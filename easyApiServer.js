@@ -200,6 +200,7 @@ const server = http.createServer((req, res) => {
 
 // 🟢 監聽啟動失敗或運行中的異常錯誤
 server.on('error', (err) => {
+    logger.error(`[${new Date().toISOString()}] 🚨 伺服器錯誤事件觸發]===============`);
     logger.error(`\n[❌ Atomic API Server 啟動或運行失敗]:`);
     logger.error(`   - 錯誤代碼 (Code): ${err.code}`);
     logger.error(`   - 錯誤訊息 (Message): ${err.message}`);
@@ -212,7 +213,7 @@ server.on('error', (err) => {
 
 // 啟動監聽，並在成功啟動後輸出服務資訊
 server.listen(PORT, () => {
-    logger.info(`================================================================`);
+    logger.info(`[${new Date().toISOString()}] ===================================`);
     logger.info(`🟢 [Atomic API Server] glb-to-frag 內嵌微服務已成功啟動`);
     logger.info(`   - 本地監聽埠: http://localhost:${PORT}`);
     logger.info(`   - 轉檔路由點: http://localhost:${PORT}/api/convert`);
