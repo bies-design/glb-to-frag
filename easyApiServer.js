@@ -140,7 +140,7 @@ const server = http.createServer((req, res) => {
                     if (fs.existsSync(absoluteMaterialsPath)) {
                         // 在 Windows 環境下使用 PowerShell 的 Compress-Archive 指令來壓縮材質包，並確保路徑正確處理
                         // exec(`powershell -Command "Compress-Archive -Path '${absoluteMaterialsPath}' -DestinationPath '${absoluteMaterialsPath}.zip'"`, { cwd: __dirname }, (error, stdout, stderr) => {
-                        const tarCmd = `tar -cjf "${fileNameWithoutExt}.bzip2" -C "${output_dir}" ./"${fileNameWithoutExt}"`;
+                        const tarCmd = `tar -cjf "${output_dir}/${fileNameWithoutExt}.bzip2" -C "${output_dir}" ./"${fileNameWithoutExt}"`;
                                             
                         exec(tarCmd, { cwd: __dirname }, (zipError, zipStdout, zipStderr) => {
                             if (zipError) {
