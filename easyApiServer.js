@@ -1,7 +1,7 @@
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
-import exec from 'child_process';
+import { exec } from 'child_process';
 
 import { Worker } from 'worker_threads';
 import { fileURLToPath } from 'url';
@@ -28,21 +28,17 @@ const logWorker = new Worker(workerPath, {
 });
 
 // ==========================================
-// 🔄 2. 劫持並拋接 stdout / stderr 到 Worker
+// 🔄 2. 安全的日誌控管器（替代高風險的全域劫持）
 // ==========================================
-const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-const originalStderrWrite = process.stderr.write.bind(process.stderr);
-
-process.stdout.write = (chunk, encoding, callback) => {
-    // 拋接給 logWorker.js 執行緒處理檔案 I/O
-    logWorker.postMessage(`[INFO] ${chunk.toString()}`);
-    // 同時保持向 Windows 終端機標準輸出，供 qckwinsvr 擷取
-    return originalStdoutWrite(chunk, encoding, callback);
-};
-
-process.stderr.write = (chunk, encoding, callback) => {
-    logWorker.postMessage(`[ERROR] ${chunk.toString()}`);
-    return originalStderrWrite(chunk, encoding, callback);
+const logger = {
+    info(msg) {
+        process.stdout.write(`[INFO] ${msg}\n`); // 正常輸出到終端機
+        logWorker.postMessage(`[INFO] ${msg}\n`); // 傳送給 Worker
+    },
+    error(msg) {
+        process.stderr.write(`[ERROR] ${msg}\n`);
+        logWorker.postMessage(`[ERROR] ${msg}\n`);
+    }
 };
 
 // ==========================================
@@ -82,9 +78,9 @@ const server = http.createServer((req, res) => {
                 const cleanBody = body.trim().replace(/^\uFEFF/, '');
                 payload = JSON.parse(cleanBody);
             } catch (err) {
-                console.error(`[❌ 真正的 JSON 解析失敗]: ${err.message}`);
-                console.log("=== 異常 Byte 結構 ===");
-                console.log(Array.from(body).map(c => `${c.charCodeAt(0).toString(16)}(${c})`).join(' '));
+                logger.error(`[❌ 真正的 JSON 解析失敗]: ${err.message}`);
+                logger.info("=== 異常 Byte 結構 ===");
+                logger.info(Array.from(body).map(c => `${c.charCodeAt(0).toString(16)}(${c})`).join(' '));
 
                 payload = ''; // 確保 payload 是一個空字串，避免後續使用時出現 undefined 的錯誤
                 res.statusCode = 400;
@@ -95,6 +91,7 @@ const server = http.createServer((req, res) => {
                 }));
             }
 
+            logger.info(`\n[📡 收到請求] 完成解析`);
             // 2. 解析成功後，提取參數並驗證
             const { input_path, output_dir } = payload;
             // 基礎參數防呆驗證
@@ -107,19 +104,19 @@ const server = http.createServer((req, res) => {
                 }));
             }
 
-            console.log(`\n[${new Date().toISOString()}] 📥 收到 Frag 轉檔請求:`);
-            console.log(`   - 輸入 GLB: ${input_path}`);
-            console.log(`   - 輸出目錄: ${output_dir}`);
+            logger.info(`\n[${new Date().toISOString()}] 📥 收到 Frag 轉檔請求:`);
+            logger.info(`   - 輸入 GLB: ${input_path}`);
+            logger.info(`   - 輸出目錄: ${output_dir}`);
 
             // 🟢 核心原子操作：精確套用 npm run pipeline -- 參數帶入規範
             // 使用雙引號包裹路徑，防止 Windows 路徑中的空格造成 CLI 解析錯誤
             const cmd = `npm run pipeline -- "${input_path}" "${output_dir}"`;
-            console.log(`[🚀 Pipeline 執行中] 指令: ${cmd}`);
+            logger.info(`[🚀 Pipeline 執行中] 指令: ${cmd}`);
 
             //3. 執行命令，並設定 cwd 確保在專案根目錄下執行
             exec(cmd, { cwd: __dirname }, (error, stdout, stderr) => {
                 if (error) {
-                    console.error(`[❌ Pipeline 執行失敗]: ${error.message}`);
+                    logger.error(`[❌ Pipeline 執行失敗]: ${error.message}`);
                     res.statusCode = 500;
                     res.setHeader('Content-Type', 'application/json; charset=utf-8');
                     return res.end(JSON.stringify({ 
@@ -132,7 +129,7 @@ const server = http.createServer((req, res) => {
                 }
 
                 // 轉檔成功，將腳本運行的終端機輸出 (stdout) 完整回傳給 A 電腦
-                console.log(`[✅ Pipeline 執行成功]`);
+                logger.info(`[✅ Pipeline 執行成功]`);
 
                 // 額外把材質包壓縮成 zip
                 try {
@@ -147,7 +144,7 @@ const server = http.createServer((req, res) => {
                                             
                         exec(tarCmd, { cwd: __dirname }, (zipError, zipStdout, zipStderr) => {
                             if (zipError) {
-                                console.error(`[❌ 壓縮材質包失敗]: ${zipError.message}`);
+                                logger.error(`[❌ 壓縮材質包失敗]: ${zipError.message}`);
                                 res.statusCode = 200;
                                 return res.end(JSON.stringify({ 
                                     status: "completed", 
@@ -158,7 +155,7 @@ const server = http.createServer((req, res) => {
                                     fragresult: `${absoluteMaterialsPath}.frag`
                                 }));
                             }
-                            console.log(`[✅ 壓縮材質包成功] 儲存至: ${path.join(output_dir, fileNameWithoutExt + '.bzip2')}`);
+                            logger.info(`[✅ 壓縮材質包成功] 儲存至: ${path.join(output_dir, fileNameWithoutExt + '.bzip2')}`);
                             res.statusCode = 200;
                             return res.end(JSON.stringify({ 
                                 status: "completed", 
@@ -170,7 +167,7 @@ const server = http.createServer((req, res) => {
                         });
                     } else {
                         // 如果該模型本來就是純幾何、沒有任何材質貼圖
-                        console.log(`[提示] 此模型未產出材質資料夾，跳過壓縮步驟。`);
+                        logger.info(`[提示] 此模型未產出材質資料夾，跳過壓縮步驟。`);
                         res.statusCode = 200;
                         return res.end(JSON.stringify({ 
                             status: "completed", 
@@ -182,7 +179,7 @@ const server = http.createServer((req, res) => {
                     }
                 } catch (innerErr) {
                     // 預防 path 或 fs 模組未正確引入時崩潰
-                    console.error(`[❌ 執行後續路徑/壓縮邏輯時發生代碼錯誤]: ${innerErr.message}`);
+                    logger.error(`[❌ 執行後續路徑/壓縮邏輯時發生代碼錯誤]: ${innerErr.message}`);
                     res.statusCode = 500;
                     return res.end(JSON.stringify({ status: "error", message: `伺服器內部代碼錯誤: ${innerErr.message}` }));
                 }
@@ -203,10 +200,10 @@ const server = http.createServer((req, res) => {
 
 // 🟢 監聽啟動失敗或運行中的異常錯誤
 server.on('error', (err) => {
-    console.error(`\n[❌ Atomic API Server 啟動或運行失敗]:`);
-    console.error(`   - 錯誤代碼 (Code): ${err.code}`);
-    console.error(`   - 錯誤訊息 (Message): ${err.message}`);
-    console.error(`================================================================`);
+    logger.error(`\n[❌ Atomic API Server 啟動或運行失敗]:`);
+    logger.error(`   - 錯誤代碼 (Code): ${err.code}`);
+    logger.error(`   - 錯誤訊息 (Message): ${err.message}`);
+    logger.error(`================================================================`);
     
     // 根據 Windows 服務常規，啟動失敗時通常會調用 process.exit(1) 
     // 這樣 qckwinsvr 才能偵測到服務異常中止，並觸發自動重啟機制
@@ -215,9 +212,9 @@ server.on('error', (err) => {
 
 // 啟動監聽，並在成功啟動後輸出服務資訊
 server.listen(PORT, () => {
-    console.log(`================================================================`);
-    console.log(`🟢 [Atomic API Server] glb-to-frag 內嵌微服務已成功啟動`);
-    console.log(`   - 本地監聽埠: http://localhost:${PORT}`);
-    console.log(`   - 轉檔路由點: http://localhost:${PORT}/api/convert`);
-    console.log(`================================================================`);
+    logger.info(`================================================================`);
+    logger.info(`🟢 [Atomic API Server] glb-to-frag 內嵌微服務已成功啟動`);
+    logger.info(`   - 本地監聽埠: http://localhost:${PORT}`);
+    logger.info(`   - 轉檔路由點: http://localhost:${PORT}/api/convert`);
+    logger.info(`================================================================`);
 });
